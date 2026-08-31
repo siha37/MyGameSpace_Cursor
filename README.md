@@ -32,10 +32,22 @@ Unity 기반 2D 횡스크롤 액션 게임 (카타나 제로 스타일)
 - Unity 2022.3 LTS 이상
 - Windows
 
+## 계획된 개선 사항
+
+### 카메라 시스템
+- **현재**: 기본 SmoothFollowCamera (MVP용)
+- **변경 예정**: Cinemachine으로 전환
+- 자세한 내용: `docs/Cinemachine전환가이드.md`
+
 ## 시작하기
 
 1. Unity에서 `/cylinder` 폴더 열기
 2. `docs/구현가이드.md` 참조하여 씬 설정
 3. TestRoom 씬에서 테스트
 
-자세한 내용은 `/docs/기획문서.md` 및 `/docs/구현가이드.md` 참조
+## 문서
+
+- `docs/기획문서.md` - 전체 게임 디자인 문서
+- `docs/구현가이드.md` - 구현 가이드 및 체크리스트
+- `docs/씬설정가이드.md` - Unity 씬 구성 단계별 가이드
+- `docs/Cinemachine전환가이드.md` - Cinemachine 전환 계획
