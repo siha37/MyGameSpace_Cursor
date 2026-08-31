@@ -84,21 +84,16 @@ namespace Cylinder.Player
                     return; // 이 상태들에서는 새 입력 무시
             }
             
-            // 이동 입력
-            float horizontal = 0f;
-            if (Input.GetKey(KeyCode.A)) horizontal -= 1f;
-            if (Input.GetKey(KeyCode.D)) horizontal += 1f;
-            
-            float vertical = 0f;
-            if (Input.GetKey(KeyCode.W)) vertical += 1f;
-            if (Input.GetKey(KeyCode.S)) vertical -= 1f;
+            // 이동 입력 (InputHelper 사용)
+            Vector2 moveInput = InputHelper.GetMovementInput();
             
             // 악셀 입력 (Shift + 방향)
-            if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
+            if (InputHelper.IsShiftPressed())
             {
-                if (horizontal != 0f || vertical != 0f)
+                if (moveInput.magnitude > 0.1f)
                 {
-                    Vector2 accelDir = new Vector2(horizontal, vertical).normalized;
+                    // 8방향으로 스냅
+                    Vector2 accelDir = InputHelper.SnapTo8Directions(moveInput);
                     _accel.TryAccel(accelDir);
                     return;
                 }
@@ -117,7 +112,7 @@ namespace Cylinder.Player
             }
             
             // 이동 처리
-            _movement.ProcessMovement(horizontal);
+            _movement.ProcessMovement(moveInput.x);
         }
 
         /// <summary>
