@@ -24,6 +24,7 @@ namespace Cylinder.Player
         private bool _isSticking;
         private float _stickElapsed;
         private SurfaceType _stickSurface;
+        private Vector2 _stickNormal; // 부착 표면의 법선 벡터
         
         private enum SurfaceType { None, Wall, Ceiling }
 
@@ -178,6 +179,7 @@ namespace Cylinder.Player
         private void AttachToSurface(Vector2 normal)
         {
             _isAcceling = false;
+            _stickNormal = normal;
             
             // 바닥이면 부착하지 않고 착지
             if (Vector2.Dot(normal, Vector2.up) > 0.7f)
@@ -194,7 +196,7 @@ namespace Cylinder.Player
             _rb.gravityScale = 0f;
             _rb.velocity = Vector2.zero;
             
-            // 표면 타입 판정
+            // 표면 타입 판정 (법선 벡터 기반)
             if (Mathf.Abs(normal.x) > 0.7f)
             {
                 _stickSurface = SurfaceType.Wall;
@@ -267,12 +269,13 @@ namespace Cylinder.Player
                             _controller.CurrentState != PlayerState.WallStick && 
                             _controller.CurrentState != PlayerState.CeilingStick;
             
-            // 지상: 하, 좌하, 우하 금지
+            // 지상: 하, 좌하, 우하 금지 (아래쪽 방향 모두 차단)
             if (isGrounded)
             {
-                if (dir.y < -0.1f && Mathf.Abs(dir.x) < 0.1f) return false; // 하
-                if (dir.y < -0.1f && dir.x < -0.1f) return false; // 좌하
-                if (dir.y < -0.1f && dir.x > 0.1f) return false; // 우하
+                // Y 성분이 음수(아래쪽)면 금지
+                if (dir.y < -0.1f)
+                    return false;
+                
                 return true;
             }
             
@@ -286,11 +289,12 @@ namespace Cylinder.Player
             // 벽 부착: 벽 쪽 방향 금지
             if (_controller.CurrentState == PlayerState.WallStick)
             {
-                // 벽 방향 판정 (간단히 마지막 악셀 방향 사용)
-                float wallSide = Mathf.Sign(_accelDirection.x);
+                // 벽 방향 판정 (표면 법선 벡터 사용)
+                // 법선이 좌측을 가리키면 우측 벽, 우측을 가리키면 좌측 벽
+                float wallNormalX = _stickNormal.x;
                 
-                // 벽과 같은 방향 금지
-                if (Mathf.Sign(dir.x) == wallSide)
+                // 벽으로 향하는 방향 금지 (법선 반대 방향)
+                if (Vector2.Dot(dir, _stickNormal) < -0.1f)
                     return false;
                 
                 return true;

@@ -92,18 +92,38 @@ namespace Cylinder.Player
             float accel = GameConstants.P_MOVE_ACCEL;
             
             // 방향이 반대면 감속 사용
-            if (Mathf.Sign(_currentVelocityX) != Mathf.Sign(targetSpeed) && _currentVelocityX != 0f && targetSpeed != 0f)
+            if (Mathf.Sign(_currentVelocityX) != Mathf.Sign(targetSpeed) && 
+                Mathf.Abs(_currentVelocityX) > 0.1f && 
+                Mathf.Abs(targetSpeed) > 0.1f)
+            {
+                accel = GameConstants.P_MOVE_DECEL;
+            }
+            
+            // 정지할 때도 감속 적용
+            if (Mathf.Abs(targetSpeed) < 0.1f && Mathf.Abs(_currentVelocityX) > 0.1f)
             {
                 accel = GameConstants.P_MOVE_DECEL;
             }
             
             // 공중이면 제어력 감소 (단, 질주 점프 중에는 속도 유지)
-            if (!_isGrounded && !_isRunning)
+            if (!_isGrounded)
             {
-                accel *= GameConstants.P_AIR_CONTROL;
+                if (_isRunning)
+                {
+                    // 질주 점프 중에는 수평 속도 유지
+                    _currentVelocityX = targetSpeed;
+                }
+                else
+                {
+                    accel *= GameConstants.P_AIR_CONTROL;
+                }
             }
             
-            _currentVelocityX = Mathf.MoveTowards(_currentVelocityX, targetSpeed, accel * Time.deltaTime);
+            // 속도 갱신
+            if (!(_isRunning && !_isGrounded)) // 질주 점프가 아닐 때만 점진적 변화
+            {
+                _currentVelocityX = Mathf.MoveTowards(_currentVelocityX, targetSpeed, accel * Time.deltaTime);
+            }
             
             // 속도 적용
             _rb.velocity = new Vector2(_currentVelocityX, _rb.velocity.y);
@@ -188,9 +208,12 @@ namespace Cylinder.Player
         /// </summary>
         private void UpdateGroundCheck()
         {
-            // 간단한 레이캐스트로 지면 체크
-            RaycastHit2D hit = Physics2D.Raycast(_rb.position, Vector2.down, 0.1f, LayerMask.GetMask("Ground"));
-            _isGrounded = hit.collider != null;
+            // 레이캐스트로 지면 체크 (플레이어 발 밑 0.1 유닛)
+            float rayDistance = 0.1f;
+            RaycastHit2D hit = Physics2D.Raycast(_rb.position, Vector2.down, rayDistance, LayerMask.GetMask("Ground"));
+            
+            // 속도가 아래쪽이고 충돌이 있으면 지상
+            _isGrounded = hit.collider != null && _rb.velocity.y <= 0.1f;
         }
 
         /// <summary>

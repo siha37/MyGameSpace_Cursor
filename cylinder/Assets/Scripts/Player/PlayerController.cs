@@ -15,6 +15,9 @@ namespace Cylinder.Player
         [Header("Components")]
         [SerializeField] private Transform _respawnPoint;
         
+        [Header("Debug")]
+        [SerializeField] private bool _showDebugGizmos = true;
+        
         private Rigidbody2D _rb;
         private PressureGauge _gauge;
         private PlayerMovement _movement;
@@ -160,6 +163,24 @@ namespace Cylinder.Player
         public void OnKillEnemy()
         {
             _gauge.GainFromKill();
+        }
+
+        /// <summary>
+        /// 디버그 기즈모 그리기
+        /// </summary>
+        private void OnDrawGizmos()
+        {
+            if (!_showDebugGizmos)
+                return;
+            
+            // 플레이어 위치
+            Gizmos.color = Color.green;
+            Gizmos.DrawWireSphere(transform.position, 0.1f);
+            
+            // 전방 방향
+            Gizmos.color = Color.blue;
+            Vector3 forward = new Vector3(FacingDirection, 0, 0) * 0.5f;
+            Gizmos.DrawLine(transform.position, transform.position + forward);
         }
     }
 }
