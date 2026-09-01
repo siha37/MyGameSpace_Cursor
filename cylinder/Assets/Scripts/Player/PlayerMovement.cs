@@ -126,7 +126,7 @@ namespace Cylinder.Player
             }
             
             // 속도 적용
-            _rb.velocity = new Vector2(_currentVelocityX, _rb.velocity.y);
+            _rb.linearVelocity = new Vector2(_currentVelocityX, _rb.linearVelocity.y);
             
             // 상태 갱신
             UpdateMovementState();
@@ -199,7 +199,7 @@ namespace Cylinder.Player
             // 점프 높이에서 필요한 초기 속도 계산
             float jumpVelocity = Mathf.Sqrt(2f * Mathf.Abs(Physics2D.gravity.y) * _rb.gravityScale * GameConstants.P_JUMP_HEIGHT);
             
-            _rb.velocity = new Vector2(_rb.velocity.x, jumpVelocity);
+            _rb.linearVelocity = new Vector2(_rb.linearVelocity.x, jumpVelocity);
             _controller.SetState(PlayerState.Jump);
         }
 
@@ -213,7 +213,7 @@ namespace Cylinder.Player
             RaycastHit2D hit = Physics2D.Raycast(_rb.position, Vector2.down, rayDistance, LayerMask.GetMask("Ground"));
             
             // 속도가 아래쪽이고 충돌이 있으면 지상
-            _isGrounded = hit.collider != null && _rb.velocity.y <= 0.1f;
+            _isGrounded = hit.collider != null && _rb.linearVelocity.y <= 0.1f;
         }
 
         /// <summary>
@@ -262,7 +262,7 @@ namespace Cylinder.Player
         /// </summary>
         public void OnLandFromAccel()
         {
-            _currentVelocityX = _rb.velocity.x;
+            _currentVelocityX = _rb.linearVelocity.x;
         }
     }
 }

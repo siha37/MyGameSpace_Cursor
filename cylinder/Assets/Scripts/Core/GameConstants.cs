@@ -29,6 +29,7 @@ namespace Cylinder.Core
         public const float AX_TIME = 0.12f;             // 악셀 소요 시간 (s)
         public const float AX_HIT_WIDTH = 0.6f;         // 경로 판정 두께
         public const float AX_STICK = 1.0f;             // 벽/천장 부착 시간 (s)
+        public const float AX_RECOVERY = 0.1f;          // 악셀 종료 후 재시전 대기 (s)
         
         // 공압 게이지
         public const float GAUGE_START = 2.0f;          // 시작 게이지

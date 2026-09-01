@@ -40,6 +40,7 @@ namespace Cylinder.Player
             _movement = new PlayerMovement(this, _rb, _gauge);
             _accel = new PlayerAccel(this, _rb, _gauge);
             _attack = new PlayerAttack(this);
+            ApplyNoFrictionMaterial();
             
             // 맵 최저점 계산 (임시로 리스폰 포인트 기준)
             if (_respawnPoint != null)
@@ -72,31 +73,37 @@ namespace Cylinder.Player
         /// </summary>
         private void HandleInput()
         {
-            // 상태별 입력 제한
+            if (_currentState == PlayerState.Dead)
+                return;
+
+            Vector2 moveInput = InputHelper.GetMovementInput();
+
+            // 악셀 입력 (Shift + 방향). 대쉬 중에는 역분사만 내부에서 허용
+            if (_currentState != PlayerState.Attack &&
+                InputHelper.IsShiftPressed() &&
+                moveInput.magnitude > 0.1f)
+            {
+                _accel.TryAccel(InputHelper.SnapTo8Directions(moveInput));
+                return;
+            }
+
+            if (_currentState == PlayerState.WallStick ||
+                _currentState == PlayerState.CeilingStick)
+            {
+                if (Input.GetKeyDown(KeyCode.Space))
+                {
+                    _accel.ReleaseStick();
+                    _movement.TryJump();
+                }
+                return;
+            }
+
             switch (_currentState)
             {
                 case PlayerState.Accel:
                 case PlayerState.AccelReverse:
-                case PlayerState.WallStick:
-                case PlayerState.CeilingStick:
                 case PlayerState.Attack:
-                case PlayerState.Dead:
-                    return; // 이 상태들에서는 새 입력 무시
-            }
-            
-            // 이동 입력 (InputHelper 사용)
-            Vector2 moveInput = InputHelper.GetMovementInput();
-            
-            // 악셀 입력 (Shift + 방향)
-            if (InputHelper.IsShiftPressed())
-            {
-                if (moveInput.magnitude > 0.1f)
-                {
-                    // 8방향으로 스냅
-                    Vector2 accelDir = InputHelper.SnapTo8Directions(moveInput);
-                    _accel.TryAccel(accelDir);
                     return;
-                }
             }
             
             // 점프 입력
@@ -146,7 +153,7 @@ namespace Cylinder.Player
             if (_respawnPoint != null)
             {
                 transform.position = _respawnPoint.position;
-                _rb.velocity = Vector2.zero;
+                _rb.linearVelocity = Vector2.zero;
                 _gauge.ResetToStart();
                 SetState(PlayerState.Idle);
             }
@@ -158,6 +165,20 @@ namespace Cylinder.Player
         public void OnKillEnemy()
         {
             _gauge.GainFromKill();
+        }
+
+        private void ApplyNoFrictionMaterial()
+        {
+            PhysicsMaterial2D material = new PhysicsMaterial2D("PlayerNoFriction")
+            {
+                friction = 0f,
+                bounciness = 0f
+            };
+            _rb.sharedMaterial = material;
+            
+            Collider2D body = GetComponent<Collider2D>();
+            if (body != null)
+                body.sharedMaterial = material;
         }
 
         /// <summary>

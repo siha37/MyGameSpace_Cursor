@@ -24,7 +24,10 @@ namespace Cylinder.Player
         private bool _isSticking;
         private float _stickElapsed;
         private SurfaceType _stickSurface;
-        private Vector2 _stickNormal; // 부착 표면의 법선 벡터
+        private Vector2 _stickNormal;
+        private Collider2D _stickCollider;
+        private Collider2D _ignoredStickCollider;
+        private float _nextAccelAllowedTime;
         
         private enum SurfaceType { None, Wall, Ceiling }
 
@@ -55,16 +58,21 @@ namespace Cylinder.Player
         /// </summary>
         public void TryAccel(Vector2 direction)
         {
-            // 역분사 체크
-            if (_isAcceling && IsOppositeDirection(direction, _accelDirection))
+            // 대쉬 중 역분사만 허용. 그 외 재시전은 불가
+            if (_isAcceling)
             {
-                if (_gauge.TryConsume(GameConstants.AX_REVERSE_COST))
+                if (IsOppositeDirection(direction, _accelDirection) &&
+                    _gauge.TryConsume(GameConstants.AX_REVERSE_COST))
                 {
                     StopAccel();
-                    _controller.SetState(PlayerState.AccelReverse);
-                    return;
+                    BeginAccelRecovery();
+                    _controller.SetState(PlayerState.Idle);
                 }
+                return;
             }
+
+            if (Time.time < _nextAccelAllowedTime)
+                return;
             
             // 방향 제한 체크
             if (!IsAccelDirectionAllowed(direction))
@@ -88,13 +96,17 @@ namespace Cylinder.Player
             _accelStartPos = _rb.position;
             _accelElapsed = 0f;
             
-            _rb.gravityScale = 0f; // 중력 무시
+            _rb.gravityScale = 0f;
             _controller.SetState(PlayerState.Accel);
             
-            // 부착 상태 해제
             if (_isSticking)
             {
+                _ignoredStickCollider = _stickCollider;
+                if (_stickNormal.sqrMagnitude > 0.01f)
+                    _rb.position += _stickNormal.normalized * 0.12f;
+                
                 _isSticking = false;
+                _stickCollider = null;
             }
         }
 
@@ -114,42 +126,43 @@ namespace Cylinder.Player
                 return;
             }
             
-            // 이동
             float speed = GameConstants.AX_DIST / GameConstants.AX_TIME;
-            Vector2 velocity = _accelDirection * speed;
+            float step = speed * Time.fixedDeltaTime;
+            Vector2 dir = _accelDirection;
+            Vector2 bodyOrigin = GetBodyOrigin();
+            Vector2 hitBoxSize = new Vector2(GameConstants.AX_HIT_WIDTH, 1.6f);
             
-            // 경로 상 적 체크 (레이캐스트)
-            RaycastHit2D hit = Physics2D.Raycast(_rb.position, _accelDirection, speed * Time.fixedDeltaTime, LayerMask.GetMask("Enemy"));
+            RaycastHit2D enemyHit = Physics2D.BoxCast(
+                bodyOrigin,
+                hitBoxSize,
+                0f,
+                dir,
+                step,
+                LayerMask.GetMask("Enemy"));
             
-            if (hit.collider != null)
+            if (enemyHit.collider != null)
             {
-                // 적 처치
-                var enemy = hit.collider.GetComponent<IDamageable>();
+                var enemy = enemyHit.collider.GetComponent<IDamageable>();
                 if (enemy != null)
                 {
+                    float travel = Mathf.Max(0f, enemyHit.distance);
+                    _rb.position += dir * travel;
+                    _rb.linearVelocity = Vector2.zero;
                     enemy.TakeDamage();
                     _controller.OnKillEnemy();
+                    EndAccel();
+                    return;
                 }
-                
-                // 적 위치에서 정지
-                _rb.position = hit.point;
-                EndAccel();
-                return;
             }
             
-            // 벽/천장 체크
-            hit = Physics2D.Raycast(_rb.position, _accelDirection, speed * Time.fixedDeltaTime, LayerMask.GetMask("Ground"));
-            
-            if (hit.collider != null)
+            if (TryGetBlockingGroundHit(bodyOrigin, hitBoxSize, dir, step, out RaycastHit2D hit))
             {
-                // 표면에 도달
-                _rb.position = hit.point;
-                AttachToSurface(hit.normal);
+                _rb.position += dir * Mathf.Max(0f, hit.distance);
+                AttachToSurface(hit.collider, hit.normal);
                 return;
             }
             
-            // 이동 적용
-            _rb.velocity = velocity;
+            _rb.linearVelocity = dir * speed;
         }
 
         /// <summary>
@@ -158,8 +171,10 @@ namespace Cylinder.Player
         private void EndAccel()
         {
             _isAcceling = false;
+            _ignoredStickCollider = null;
             _rb.gravityScale = 1f;
-            _rb.velocity = Vector2.zero;
+            _rb.linearVelocity = Vector2.zero;
+            BeginAccelRecovery();
             _controller.SetState(PlayerState.Idle);
         }
 
@@ -169,34 +184,35 @@ namespace Cylinder.Player
         private void StopAccel()
         {
             _isAcceling = false;
+            _ignoredStickCollider = null;
             _rb.gravityScale = 1f;
-            _rb.velocity = Vector2.zero;
+            _rb.linearVelocity = Vector2.zero;
         }
 
         /// <summary>
         /// 표면 부착
         /// </summary>
-        private void AttachToSurface(Vector2 normal)
+        private void AttachToSurface(Collider2D surface, Vector2 normal)
         {
             _isAcceling = false;
+            _ignoredStickCollider = null;
             _stickNormal = normal;
+            BeginAccelRecovery();
             
-            // 바닥이면 부착하지 않고 착지
             if (Vector2.Dot(normal, Vector2.up) > 0.7f)
             {
                 _rb.gravityScale = 1f;
-                _rb.velocity = Vector2.zero;
+                _rb.linearVelocity = Vector2.zero;
                 _controller.SetState(PlayerState.Idle);
                 return;
             }
             
-            // 벽/천장 부착
             _isSticking = true;
+            _stickCollider = surface;
             _stickElapsed = 0f;
             _rb.gravityScale = 0f;
-            _rb.velocity = Vector2.zero;
+            _rb.linearVelocity = Vector2.zero;
             
-            // 표면 타입 판정 (법선 벡터 기반)
             if (Mathf.Abs(normal.x) > 0.7f)
             {
                 _stickSurface = SurfaceType.Wall;
@@ -228,9 +244,22 @@ namespace Cylinder.Player
         /// </summary>
         private void DetachFromSurface()
         {
-            _isSticking = false;
-            _rb.gravityScale = 1f;
+            ReleaseStick();
             _controller.SetState(PlayerState.Jump);
+        }
+
+        /// <summary>
+        /// 점프 이탈 등. 1초 부착은 악셀로 도달한 경우만 유지한다.
+        /// </summary>
+        public void ReleaseStick()
+        {
+            if (_stickNormal.sqrMagnitude > 0.01f)
+                _rb.position += _stickNormal.normalized * 0.08f;
+            
+            _isSticking = false;
+            _stickCollider = null;
+            _ignoredStickCollider = null;
+            _rb.gravityScale = 1f;
         }
 
         /// <summary>
@@ -302,6 +331,49 @@ namespace Cylinder.Player
             
             // 공중: 모든 방향 허용
             return true;
+        }
+
+        /// <summary>
+        /// 악셀 가속 종료 후 재시전 대기
+        /// </summary>
+        private void BeginAccelRecovery()
+        {
+            _nextAccelAllowedTime = Time.time + GameConstants.AX_RECOVERY;
+        }
+
+        private Vector2 GetBodyOrigin()
+        {
+            return _rb.position + Vector2.up * 0.9f;
+        }
+
+        private bool TryGetBlockingGroundHit(Vector2 origin, Vector2 size, Vector2 dir, float distance, out RaycastHit2D hit)
+        {
+            hit = default;
+            RaycastHit2D[] hits = Physics2D.BoxCastAll(origin, size, 0f, dir, distance, LayerMask.GetMask("Ground"));
+            float best = float.MaxValue;
+            bool found = false;
+            
+            for (int i = 0; i < hits.Length; i++)
+            {
+                RaycastHit2D candidate = hits[i];
+                if (candidate.collider == null)
+                    continue;
+                
+                if (_ignoredStickCollider != null && candidate.collider == _ignoredStickCollider)
+                    continue;
+                
+                if (candidate.distance < 0.05f && Vector2.Dot(dir, candidate.normal) > 0.01f)
+                    continue;
+                
+                if (candidate.distance < best)
+                {
+                    best = candidate.distance;
+                    hit = candidate;
+                    found = true;
+                }
+            }
+            
+            return found;
         }
     }
 }
