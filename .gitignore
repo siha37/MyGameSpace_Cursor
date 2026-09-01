@@ -102,8 +102,8 @@ playground.xcworkspace
 /[Uu]ser[Ss]ettings/
 /[Mm]emory[Cc]aptures/
 
-# Asset meta data should only be ignored when the corresponding asset is also ignored
-!/[Aa]ssets/**/*.meta
+# Meta 파일은 Unity가 자동 생성
+*.meta
 
 # Build output
 *.apk
