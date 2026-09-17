@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cylinder - 2D 횡스크롤 스타일리시 액션 기획서</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #00d4ff;
+            --secondary: #ff6b35;
+            --accent: #ffd23f;
+            --danger: #ff006e;
+            --success: #06ffa5;
+            --bg-dark: #0a0e27;
+            --bg-card: #1a1f3a;
+            --bg-hover: #252b4a;
+            --text-primary: #ffffff;
+            --text-secondary: #a0aec0;
+            --border: #2d3561;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #1a1f3a 100%);
+            color: var(--text-primary);
+            line-height: 1.8;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 3rem 2rem;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="none"/><path d="M0 0L100 100M100 0L0 100" stroke="rgba(255,255,255,0.05)" stroke-width="1"/></svg>');
+            opacity: 0.3;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 900;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .header .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            position: relative;
+        }
+
+        .meta-info {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            margin: 2rem auto;
+            max-width: 1200px;
+            border-radius: 12px;
+            border-left: 4px solid var(--primary);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .meta-item .icon {
+            font-size: 1.5rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .nav {
+            background: var(--bg-card);
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        .nav h3 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .nav-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.5rem;
+        }
+
+        .nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav a:hover {
+            background: var(--bg-hover);
+            color: var(--primary);
+            transform: translateX(5px);
+        }
+
+        .section {
+            background: var(--bg-card);
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        .section-title {
+            color: var(--primary);
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .subsection-title {
+            color: var(--accent);
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th {
+            background: linear-gradient(135deg, var(--primary), #667eea);
+            color: white;
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .key-visual {
+            display: inline-block;
+            background: var(--bg-dark);
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            border: 2px solid var(--border);
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: var(--accent);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            margin: 0 0.2rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin: 0 0.3rem;
+        }
+
+        .badge-mvp {
+            background: linear-gradient(135deg, #06ffa5, #00d4ff);
+            color: var(--bg-dark);
+        }
+
+        .badge-tbd {
+            background: var(--bg-hover);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .badge-done {
+            background: var(--success);
+            color: var(--bg-dark);
+        }
+
+        .highlight-box {
+            background: rgba(0, 212, 255, 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+        }
+
+        .warning-box {
+            background: rgba(255, 107, 53, 0.1);
+            border-left: 4px solid var(--secondary);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+        }
+
+        .success-box {
+            background: rgba(6, 255, 165, 0.1);
+            border-left: 4px solid var(--success);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+        }
+
+        .direction-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            max-width: 300px;
+            margin: 1rem 0;
+        }
+
+        .direction-cell {
+            background: var(--bg-dark);
+            padding: 1rem;
+            text-align: center;
+            border-radius: 8px;
+            border: 2px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        .direction-cell.allowed {
+            border-color: var(--success);
+            background: rgba(6, 255, 165, 0.1);
+        }
+
+        .direction-cell.blocked {
+            border-color: var(--danger);
+            background: rgba(255, 0, 110, 0.1);
+            opacity: 0.5;
+        }
+
+        .param-table td:first-child {
+            font-family: 'Courier New', monospace;
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .param-table td:nth-child(3) {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        code {
+            background: var(--bg-dark);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: var(--accent);
+        }
+
+        .flow-diagram {
+            background: var(--bg-dark);
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            margin: 1.5rem 0;
+            font-family: 'Courier New', monospace;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+
+        .checklist li {
+            padding: 0.8rem;
+            margin: 0.5rem 0;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            border-left: 3px solid var(--success);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .checklist li::before {
+            content: '✓';
+            color: var(--success);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .nav-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .section {
+                padding: 1.5rem;
+            }
+
+            table {
+                font-size: 0.9rem;
+            }
+        }
+
+        @media print {
+            body {
+                background: white;
+                color: black;
+            }
+
+            .nav {
+                display: none;
+            }
+
+            .section {
+                break-inside: avoid;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎮 Cylinder</h1>
+        <div class="subtitle">2D 횡스크롤 스타일리시 액션 게임 기획서</div>
+    </div>
+
+    <div class="container">
+        <div class="meta-info">
+            <div class="meta-item">
+                <span class="icon">📋</span>
+                <div>
+                    <strong>상태</strong><br>
+                    <span class="badge badge-mvp">MVP v0.3</span>
+                </div>
+            </div>
+            <div class="meta-item">
+                <span class="icon">📅</span>
+                <div>
+                    <strong>최종 갱신</strong><br>
+                    2026-08-31
+                </div>
+            </div>
+            <div class="meta-item">
+                <span class="icon">🎯</span>
+                <div>
+                    <strong>코드네임</strong><br>
+                    Cylinder
+                </div>
+            </div>
+            <div class="meta-item">
+                <span class="icon">🎨</span>
+                <div>
+                    <strong>레퍼런스</strong><br>
+                    Katana ZERO
+                </div>
+            </div>
+        </div>
+
+        <nav class="nav">
+            <h3>📑 목차</h3>
+            <div class="nav-grid">
+                <a href="#overview">📖 개요</a>
+                <a href="#design">🎯 코어 디자인</a>
+                <a href="#controls">🎮 조작</a>
+                <a href="#player">👤 플레이어</a>
+                <a href="#gauge">⚡ 공압 게이지</a>
+                <a href="#units">💀 유닛 규칙</a>
+                <a href="#enemy">🤖 적 유닛</a>
+                <a href="#params">📊 파라미터</a>
+                <a href="#mvp">✅ MVP</a>
+            </div>
+        </nav>
+
+        <!-- 1. 개요 -->
+        <section id="overview" class="section">
+            <h2 class="section-title">📖 1. 개요</h2>
+            
+            <table>
+                <tr>
+                    <th>항목</th>
+                    <th>내용</th>
+                </tr>
+                <tr>
+                    <td><strong>플랫폼</strong></td>
+                    <td>🖥️ Windows</td>
+                </tr>
+                <tr>
+                    <td><strong>엔진</strong></td>
+                    <td>🎮 Unity</td>
+                </tr>
+                <tr>
+                    <td><strong>장르</strong></td>
+                    <td>2D 횡스크롤 스타일리시 액션</td>
+                </tr>
+                <tr>
+                    <td><strong>레퍼런스</strong></td>
+                    <td>🎯 Katana ZERO</td>
+                </tr>
+                <tr>
+                    <td><strong>시점</strong></td>
+                    <td>사이드 뷰, 횡 스크롤</td>
+                </tr>
+                <tr>
+                    <td><strong>핵심 톤</strong></td>
+                    <td>⚡ 빠르고, 심플하고, 한 번의 실수가 곧 죽음</td>
+                </tr>
+            </table>
+
+            <div class="highlight-box">
+                <strong>💡 핵심 컨셉</strong><br>
+                한 판의 전투는 <strong>짧은 판단 → 즉각 처형 → 다음 이동</strong>으로 끝납니다.<br>
+                복잡한 콤보나 HP 막기보다, <strong>위치·방향·타이밍</strong>만으로 승부가 결정됩니다.
+            </div>
+        </section>
+
+        <!-- 2. 코어 디자인 -->
+        <section id="design" class="section">
+            <h2 class="section-title">🎯 2. 코어 디자인</h2>
+            
+            <h3 class="subsection-title">⚡ 디자인 포인트</h3>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin: 1.5rem 0;">
+                <div class="highlight-box">
+                    <strong>🚀 스피드</strong><br>
+                    이동, 달리기, 악셀, 공격이 모두 즉각적으로 반응
+                </div>
+                <div class="highlight-box">
+                    <strong>✨ 심플함</strong><br>
+                    입력은 적고, 규칙은 명확. 한 대면 죽음
+                </div>
+                <div class="highlight-box">
+                    <strong>🎨 스타일리시</strong><br>
+                    악셀 궤적, 관성, 벽 부착이 시각적 리듬 생성
+                </div>
+            </div>
+
+            <h3 class="subsection-title">🔄 플레이 루프</h3>
+            <div class="flow-diagram">
+                진입 → 경로 파악 → 접근/유인 → 처형 → 공압 회복 → 다음 구간
+            </div>
+
+            <div class="warning-box">
+                ⚠️ <strong>실패 조건</strong>: 피격 1회 = 사망 (특수 유닛 제외)
+            </div>
+
+            <h3 class="subsection-title">📚 용어 정의</h3>
+            <table>
+                <tr>
+                    <th>용어</th>
+                    <th>정의</th>
+                </tr>
+                <tr>
+                    <td><strong>P</strong></td>
+                    <td>플레이어블 캐릭터</td>
+                </tr>
+                <tr>
+                    <td><strong>악셀</strong></td>
+                    <td>⚡ 공압 게이지를 소모하는 8방향 대쉬</td>
+                </tr>
+                <tr>
+                    <td><strong>공압 게이지</strong></td>
+                    <td>악셀 자원. float로 점진 충전</td>
+                </tr>
+                <tr>
+                    <td><strong>역분사</strong></td>
+                    <td>악셀 중 반대 방향 입력으로 대쉬 중단</td>
+                </tr>
+                <tr>
+                    <td><strong>부착</strong></td>
+                    <td>악셀로 벽/천장 도달 시 1초간 고정</td>
+                </tr>
+            </table>
+        </section>
+
+        <!-- 3. 조작 -->
+        <section id="controls" class="section">
+            <h2 class="section-title">🎮 3. 조작</h2>
+            
+            <div class="highlight-box">
+                💻 <strong>플랫폼</strong>: Windows / 키보드 + 마우스
+            </div>
+
+            <table>
+                <tr>
+                    <th>행동</th>
+                    <th>입력</th>
+                    <th>비고</th>
+                </tr>
+                <tr>
+                    <td>🚶 이동</td>
+                    <td>
+                        <span class="key-visual">W</span>
+                        <span class="key-visual">A</span>
+                        <span class="key-visual">S</span>
+                        <span class="key-visual">D</span>
+                    </td>
+                    <td>기본 보행. 관성 적용</td>
+                </tr>
+                <tr>
+                    <td>🦘 점프</td>
+                    <td><span class="key-visual">Space</span></td>
+                    <td>고정 높이</td>
+                </tr>
+                <tr>
+                    <td>🏃 달리기</td>
+                    <td>
+                        <span class="key-visual">A</span> 또는
+                        <span class="key-visual">D</span> 2연타 + 홀드
+                    </td>
+                    <td>공압 충전</td>
+                </tr>
+                <tr>
+                    <td>⚡ 악셀</td>
+                    <td>
+                        <span class="key-visual">Shift</span> + 방향
+                    </td>
+                    <td>8방향 고속 대쉬</td>
+                </tr>
+                <tr>
+                    <td>⚔️ 공격</td>
+                    <td>🖱️ 마우스 좌클릭</td>
+                    <td>커서 방향 근접 공격</td>
+                </tr>
+            </table>
+
+            <h3 class="subsection-title">🧭 악셀 8방향</h3>
+            <p><span class="key-visual">Shift</span>를 누른 채 방향키 입력</p>
+
+            <div class="direction-grid">
+                <div class="direction-cell allowed">↖<br>좌상<br>A+W</div>
+                <div class="direction-cell allowed">↑<br>상<br>W</div>
+                <div class="direction-cell allowed">↗<br>우상<br>W+D</div>
+                <div class="direction-cell allowed">←<br>좌<br>A</div>
+                <div class="direction-cell" style="background: var(--bg-hover);">⚡<br>악셀<br>중심</div>
+                <div class="direction-cell allowed">→<br>우<br>D</div>
+                <div class="direction-cell allowed">↙<br>좌하<br>A+S</div>
+                <div class="direction-cell allowed">↓<br>하<br>S</div>
+                <div class="direction-cell allowed">↘<br>우하<br>S+D</div>
+            </div>
+        </section>
+
+        <!-- 4. 플레이어 시스템 -->
+        <section id="player" class="section">
+            <h2 class="section-title">👤 4. 플레이어 시스템</h2>
+            
+            <h3 class="subsection-title">🚶 4.1 이동 & 관성</h3>
+            
+            <div class="success-box">
+                <strong>✨ 방향 전환 관성 (필수 특징)</strong><br>
+                우측 이동 중 좌측 전환 시 속도가 즉시 반전되지 않습니다.
+                <div class="flow-diagram">
+                    가속 중 → 감속 → 영점(0) → 반대 방향 가속
+                </div>
+                카타나 제로보다 약간 묵직하되, 답답하지 않은 수준
+            </div>
+
+            <h3 class="subsection-title">🦘 4.2 점프</h3>
+            <ul class="checklist">
+                <li>고정 높이 (홀드 시간 무관)</li>
+                <li>공중에서 악셀 사용 가능</li>
+                <li>공중 공격 가능</li>
+                <li><strong>질주 점프</strong>: 달리기 중 점프 시 거리 증가</li>
+            </ul>
+
+            <h3 class="subsection-title">🏃 4.3 달리기</h3>
+            <table>
+                <tr>
+                    <th>방향</th>
+                    <th>입력</th>
+                    <th>효과</th>
+                </tr>
+                <tr>
+                    <td>← 좌측 질주</td>
+                    <td><span class="key-visual">A</span> 2연타 + 홀드</td>
+                    <td rowspan="2">⚡ 공압 게이지 충전<br>(0.7 / 초)</td>
+                </tr>
+                <tr>
+                    <td>→ 우측 질주</td>
+                    <td><span class="key-visual">D</span> 2연타 + 홀드</td>
+                </tr>
+            </table>
+
+            <div class="highlight-box">
+                <strong>⏱️ 2연타 판정</strong>: 0.25초 이내<br>
+                <strong>🔄 유지 조건</strong>: 홀드 유지 (떼면 종료)<br>
+                <strong>✈️ 공중 유지</strong>: 질주 점프 중에도 게이지 충전
+            </div>
+
+            <h3 class="subsection-title">⚔️ 4.4 공격</h3>
+            <div class="warning-box">
+                <strong>🎯 근접 한 방 처형</strong> (카타나 제로 스타일)<br><br>
+                • 입력: 🖱️ 마우스 좌클릭<br>
+                • 방향: 마우스 커서 위치<br>
+                • 판정: 범위 안 적 즉시 사망<br>
+                • 가능: 지상·공중<br>
+                • 불가: 악셀 중, 벽/천장 부착 중
+            </div>
+
+            <h3 class="subsection-title">⚡ 4.5 악셀 (핵심 시스템)</h3>
+            
+            <div class="highlight-box">
+                <strong>공통 규칙</strong><br>
+                • 공압 게이지 1.0 소모<br>
+                • 8방향 고속 직선 대쉬<br>
+                • 중력 무시, 공격 불가<br>
+                • 경로상 적 처치 (첫 적에서 정지)<br>
+                • 연속 악셀 가능 (게이지 충분 시)
+            </div>
+
+            <h4 style="color: var(--accent); margin-top: 2rem;">📍 지상 악셀</h4>
+            <div class="direction-grid">
+                <div class="direction-cell allowed">↖ 좌상</div>
+                <div class="direction-cell allowed">↑ 상</div>
+                <div class="direction-cell allowed">↗ 우상</div>
+                <div class="direction-cell allowed">← 좌</div>
+                <div class="direction-cell" style="background: var(--primary); color: var(--bg-dark);">지상</div>
+                <div class="direction-cell allowed">→ 우</div>
+                <div class="direction-cell blocked">❌ 좌하</div>
+                <div class="direction-cell blocked">❌ 하</div>
+                <div class="direction-cell blocked">❌ 우하</div>
+            </div>
+
+            <h4 style="color: var(--accent); margin-top: 2rem;">☁️ 공중 악셀</h4>
+            <div class="success-box">
+                ✅ 8방향 모두 허용
+            </div>
+
+            <h4 style="color: var(--accent); margin-top: 2rem;">🏠 천장 부착 중</h4>
+            <div class="direction-grid">
+                <div class="direction-cell blocked">❌</div>
+                <div class="direction-cell blocked">❌ 상</div>
+                <div class="direction-cell blocked">❌</div>
+                <div class="direction-cell allowed">← 좌</div>
+                <div class="direction-cell" style="background: var(--secondary); color: white;">천장</div>
+                <div class="direction-cell allowed">→ 우</div>
+                <div class="direction-cell allowed">↙ 좌하</div>
+                <div class="direction-cell blocked">❌</div>
+                <div class="direction-cell allowed">↘ 우하</div>
+            </div>
+
+            <h4 style="color: var(--accent); margin-top: 2rem;">🧱 벽 부착</h4>
+            <table>
+                <tr>
+                    <th>부착 위치</th>
+                    <th>허용 방향</th>
+                    <th>금지 방향</th>
+                </tr>
+                <tr>
+                    <td>우측 벽 →|</td>
+                    <td>↑ ↖ ← ↙ ↓</td>
+                    <td>❌ → ↗ ↘ (벽 쪽)</td>
+                </tr>
+                <tr>
+                    <td>좌측 벽 |←</td>
+                    <td>↑ ↗ → ↘ ↓</td>
+                    <td>❌ ← ↖ ↙ (벽 쪽)</td>
+                </tr>
+            </table>
+
+            <h4 style="color: var(--accent); margin-top: 2rem;">🎯 부착 시스템</h4>
+            <div class="highlight-box">
+                <strong>악셀로 벽/천장 도달 시</strong><br>
+                • ⏱️ 부착 시간: <strong>1.0초</strong><br>
+                • 🚫 중력/관성 정지, 공격 불가<br>
+                • ⏰ 1초 후 자동 낙하<br>
+                • 🔓 수동 이탈: 악셀 또는 점프만 가능<br>
+                • 💡 바닥 도달 시 부착 없이 착지
+            </div>
+
+            <h4 style="color: var(--accent); margin-top: 2rem;">🔄 역분사</h4>
+            <div class="warning-box">
+                <strong>악셀 진행 중 반대 방향 재입력</strong><br><br>
+                • 💨 즉시 중단 (정지)<br>
+                • ⚡ 소모량: <strong>0.5 회분</strong><br>
+                • 🎯 판정: 정확히 반대 1축 (상↔하, 좌↔우, 좌상↔우하, 우상↔좌하)<br>
+                • ⚠️ 게이지 0.5 미만 시 불가
+            </div>
+        </section>
+
+        <!-- 5. 공압 게이지 -->
+        <section id="gauge" class="section">
+            <h2 class="section-title">⚡ 5. 공압 게이지</h2>
+            
+            <div class="highlight-box">
+                <strong>자원 타입</strong>: <code>float</code><br>
+                <strong>표시</strong>: HUD 게이지 (1칸 = 악셀 1회분)
+            </div>
+
+            <table>
+                <tr>
+                    <th>이벤트</th>
+                    <th>변화</th>
+                </tr>
+                <tr>
+                    <td>⚡ 악셀 시전</td>
+                    <td style="color: var(--danger); font-weight: bold;">-1.0 회분</td>
+                </tr>
+                <tr>
+                    <td>🔄 역분사</td>
+                    <td style="color: var(--danger); font-weight: bold;">-0.5 회분</td>
+                </tr>
+                <tr>
+                    <td>🏃 달리기 유지</td>
+                    <td style="color: var(--success); font-weight: bold;">+0.7 / 초</td>
+                </tr>
+                <tr>
+                    <td>💀 적 처치</td>
+                    <td style="color: var(--success); font-weight: bold;">+1.0 회분</td>
+                </tr>
+            </table>
+
+            <div class="success-box">
+                <strong>게이지 수치</strong><br>
+                • 🎬 시작: <strong>2.0 회분</strong><br>
+                • 🔝 최대: <strong>4.0 회분</strong><br>
+                • 📈 충전: 달리기만 가능 (대기·보행 시 충전 없음)<br>
+                • ✅ 처치 충전: 공격·악셀 경로 처치 모두 적용
+            </div>
+        </section>
+
+        <!-- 6. 유닛 공통 규칙 -->
+        <section id="units" class="section">
+            <h2 class="section-title">💀 6. 유닛 공통 규칙</h2>
+            
+            <div class="warning-box">
+                <strong>⚠️ 즉사 시스템</strong><br>
+                모든 유닛(플레이어 + 적)에 적용<br><br>
+                <strong>피격 1회 = 즉시 사망</strong><br>
+                공격, 악셀 경로 처형, 모든 살상 판정 동일
+            </div>
+
+            <h3 class="subsection-title">🎯 특수 유닛 (예외)</h3>
+            <div class="highlight-box">
+                보스 및 스토리 특화 유닛<br><br>
+                • ❌ 즉사하지 않음<br>
+                • 🎭 고유 패턴 보유<br>
+                • 💥 일정 횟수 타격 후 사망<br>
+                • <span class="badge badge-tbd">본편 TBD</span>
+            </div>
+
+            <h3 class="subsection-title">🔄 MVP 리스폰</h3>
+            <div class="success-box">
+                <strong>낙하 리스폰</strong><br>
+                맵 최저점 -5 유닛 이하 낙하 시<br>
+                → 시작점 복귀 + 게이지 2.0 복구
+            </div>
+        </section>
+
+        <!-- 8. 적 유닛 -->
+        <section id="enemy" class="section">
+            <h2 class="section-title">🤖 8. 적 유닛</h2>
+            
+            <h3 class="subsection-title">👾 8.1 기본 적</h3>
+            <div class="highlight-box">
+                <strong>역할</strong>: 구간을 채우는 표준 위협<br>
+                예측 가능하지만 방심하면 죽음
+            </div>
+
+            <table>
+                <tr>
+                    <th>상태</th>
+                    <th>행동</th>
+                </tr>
+                <tr>
+                    <td>🔍 미발견</td>
+                    <td>
+                        • 지정 경로 순회 또는 대기<br>
+                        • 방향 전환 시 정지 → 전환 → 이동
+                    </td>
+                </tr>
+                <tr>
+                    <td>⚠️ 발견 후</td>
+                    <td>
+                        • 좌우 이동하며 추적<br>
+                        • 일정 거리 도달 시 공격<br>
+                        • 공격 후 추적 반복
+                    </td>
+                </tr>
+                <tr>
+                    <td>⚔️ 공격</td>
+                    <td>
+                        • 근접 범위 안의 P 즉사<br>
+                        • 선딜 있음 (반응 가능)<br>
+                        • <span class="badge badge-tbd">수치 TBD</span>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="warning-box">
+                <strong>⚙️ 방향 전환 절차 (약점)</strong><br>
+                이동 → 정지 → 전환 → 이동<br><br>
+                정지 시간과 턴 애니메이션이 파고들 수 있는 기회
+            </div>
+
+            <h3 class="subsection-title">🛡️ 8.2 방패병</h3>
+            <div class="highlight-box">
+                <strong>역할</strong>: 정면 돌파 차단<br>
+                후면 우회·악셀 역습 요구
+            </div>
+
+            <table>
+                <tr>
+                    <th>기능</th>
+                    <th>설명</th>
+                </tr>
+                <tr>
+                    <td>🛡️ 전방 방패</td>
+                    <td>
+                        • 일반 공격 차단 (무효)<br>
+                        • 악셀 차단 (정지)<br>
+                        • P는 후딜만 남음
+                    </td>
+                </tr>
+                <tr>
+                    <td>🎯 후면 약점</td>
+                    <td>
+                        • 후방 공격/악셀 즉사<br>
+                        • 후방 감지 시 1.0초 후 전환<br>
+                        • ⚡ 1초 = 암살 타이밍
+                    </td>
+                </tr>
+            </table>
+
+            <h3 class="subsection-title">👹 8.3 특수 유닛</h3>
+            <div class="highlight-box">
+                <span class="badge badge-tbd">본편에서 추가</span><br><br>
+                즉사 예외, 고유 패턴, 타격 횟수를 유닛별로 정의
+            </div>
+        </section>
+
+        <!-- 9. 구현 파라미터 -->
+        <section id="params" class="section">
+            <h2 class="section-title">📊 9. 구현 파라미터</h2>
+            
+            <div class="success-box">
+                <strong>🎯 밸런스 조정 시 이 표만 갱신</strong><br>
+                플레이어·카메라·허수아비 수치는 <span class="badge badge-mvp">MVP 확정</span><br>
+                적 AI 수치는 <span class="badge badge-tbd">본편 TBD</span>
+            </div>
+
+            <h3 class="subsection-title">👤 플레이어 이동</h3>
+            <table class="param-table">
+                <tr>
+                    <th>ID</th>
+                    <th>항목</th>
+                    <th>값</th>
+                    <th>비고</th>
+                </tr>
+                <tr>
+                    <td>P-MOVE-SPEED</td>
+                    <td>보행 최고 속도</td>
+                    <td>6</td>
+                    <td>Unity 단위/s</td>
+                </tr>
+                <tr>
+                    <td>P-MOVE-ACCEL</td>
+                    <td>보행 가속</td>
+                    <td>40</td>
+                    <td>/s²</td>
+                </tr>
+                <tr>
+                    <td>P-MOVE-DECEL</td>
+                    <td>방향 전환 감속</td>
+                    <td>50</td>
+                    <td>/s² (영점 통과 필수)</td>
+                </tr>
+                <tr>
+                    <td>P-RUN-TAP</td>
+                    <td>달리기 2연타 윈도우</td>
+                    <td>0.25</td>
+                    <td>초</td>
+                </tr>
+                <tr>
+                    <td>P-RUN-SPEED</td>
+                    <td>달리기 최고 속도</td>
+                    <td>11</td>
+                    <td>보행의 약 1.8배</td>
+                </tr>
+                <tr>
+                    <td>P-JUMP-HEIGHT</td>
+                    <td>점프 높이</td>
+                    <td>2.2</td>
+                    <td>고정 (홀드 무관)</td>
+                </tr>
+                <tr>
+                    <td>P-AIR-CONTROL</td>
+                    <td>공중 좌우 가속</td>
+                    <td>50%</td>
+                    <td>지상의 50%</td>
+                </tr>
+            </table>
+
+            <h3 class="subsection-title">⚔️ 플레이어 공격</h3>
+            <table class="param-table">
+                <tr>
+                    <th>ID</th>
+                    <th>항목</th>
+                    <th>값</th>
+                    <th>비고</th>
+                </tr>
+                <tr>
+                    <td>P-ATK-RANGE</td>
+                    <td>공격 전방 거리</td>
+                    <td>1.4</td>
+                    <td>Unity 단위</td>
+                </tr>
+                <tr>
+                    <td>P-ATK-WIDTH</td>
+                    <td>공격 두께</td>
+                    <td>0.8</td>
+                    <td>Unity 단위</td>
+                </tr>
+                <tr>
+                    <td>P-ATK-ACTIVE</td>
+                    <td>공격 판정 유지</td>
+                    <td>0.08</td>
+                    <td>초</td>
+                </tr>
+                <tr>
+                    <td>P-ATK-RECOVER</td>
+                    <td>후딜</td>
+                    <td>0.12</td>
+                    <td>초</td>
+                </tr>
+            </table>
+
+            <h3 class="subsection-title">⚡ 악셀 시스템</h3>
+            <table class="param-table">
+                <tr>
+                    <th>ID</th>
+                    <th>항목</th>
+                    <th>값</th>
+                    <th>비고</th>
+                </tr>
+                <tr>
+                    <td>AX-COST</td>
+                    <td>악셀 소모</td>
+                    <td>1.0</td>
+                    <td>회분</td>
+                </tr>
+                <tr>
+                    <td>AX-REVERSE-COST</td>
+                    <td>역분사 소모</td>
+                    <td>0.5</td>
+                    <td>회분</td>
+                </tr>
+                <tr>
+                    <td>AX-DIST</td>
+                    <td>악셀 거리</td>
+                    <td>4.0</td>
+                    <td>Unity 단위</td>
+                </tr>
+                <tr>
+                    <td>AX-TIME</td>
+                    <td>악셀 소요 시간</td>
+                    <td>0.12</td>
+                    <td>초 (속도 = 거리/시간)</td>
+                </tr>
+                <tr>
+                    <td>AX-HIT-WIDTH</td>
+                    <td>경로 판정 두께</td>
+                    <td>0.6</td>
+                    <td>Unity 단위</td>
+                </tr>
+                <tr>
+                    <td>AX-STICK</td>
+                    <td>벽/천장 부착 시간</td>
+                    <td>1.0</td>
+                    <td>초</td>
+                </tr>
+            </table>
+
+            <h3 class="subsection-title">⚡ 공압 게이지</h3>
+            <table class="param-table">
+                <tr>
+                    <th>ID</th>
+                    <th>항목</th>
+                    <th>값</th>
+                    <th>비고</th>
+                </tr>
+                <tr>
+                    <td>GAUGE-START</td>
+                    <td>시작 게이지</td>
+                    <td>2.0</td>
+                    <td>회분</td>
+                </tr>
+                <tr>
+                    <td>GAUGE-MAX</td>
+                    <td>게이지 최대</td>
+                    <td>4.0</td>
+                    <td>회분</td>
+                </tr>
+                <tr>
+                    <td>GAUGE-RUN-RATE</td>
+                    <td>달리기 충전 속도</td>
+                    <td>0.7</td>
+                    <td>/초 (0→4 약 5.7초)</td>
+                </tr>
+                <tr>
+                    <td>GAUGE-KILL</td>
+                    <td>처치 충전</td>
+                    <td>1.0</td>
+                    <td>회분</td>
+                </tr>
+            </table>
+
+            <h3 class="subsection-title">📹 카메라</h3>
+            <table class="param-table">
+                <tr>
+                    <th>ID</th>
+                    <th>항목</th>
+                    <th>값</th>
+                    <th>비고</th>
+                </tr>
+                <tr>
+                    <td>CAM-DAMP-X</td>
+                    <td>카메라 수평 감쇠</td>
+                    <td>0.12</td>
+                    <td>초 (SmoothDamp)</td>
+                </tr>
+                <tr>
+                    <td>CAM-DAMP-Y</td>
+                    <td>카메라 수직 감쇠</td>
+                    <td>0.20</td>
+                    <td>초 (수평보다 느림)</td>
+                </tr>
+            </table>
+        </section>
+
+        <!-- 11. MVP -->
+        <section id="mvp" class="section">
+            <h2 class="section-title">✅ 11. MVP 의사결정</h2>
+            
+            <div class="highlight-box">
+                <strong>🎯 목표</strong><br>
+                플레이어의 조작감이 완성됐는지 검증<br>
+                적 AI·시야·방패병·보스는 제외. 적은 <strong>허수아비</strong>만 사용
+            </div>
+
+            <h3 class="subsection-title">📦 MVP 범위</h3>
+            <table>
+                <tr>
+                    <th style="background: linear-gradient(135deg, var(--success), #06d6a0);">✅ 포함</th>
+                    <th style="background: linear-gradient(135deg, var(--danger), #c1121f);">❌ 제외</th>
+                </tr>
+                <tr>
+                    <td>
+                        • 이동, 점프, 달리기<br>
+                        • 악셀, 역분사, 벽/천장 부착<br>
+                        • 공격, 공압 게이지<br>
+                        • 테스트 룸 (지형)<br>
+                        • 허수아비<br>
+                        • 게이지 HUD<br>
+                        • 스무스 카메라
+                    </td>
+                    <td>
+                        • 적 AI, 시야<br>
+                        • 방패병, 특수 유닛<br>
+                        • 스테이지 진행<br>
+                        • 체크포인트, 스토리<br>
+                        • 사운드, 이펙트 완성도<br>
+                        • 키 리바인드
+                    </td>
+                </tr>
+            </table>
+
+            <h3 class="subsection-title">🎯 허수아비 사양</h3>
+            <table>
+                <tr>
+                    <th>항목</th>
+                    <th>내용</th>
+                </tr>
+                <tr>
+                    <td>🤖 행동</td>
+                    <td>제자리 정지 (이동·공격·시야 없음)</td>
+                </tr>
+                <tr>
+                    <td>💀 사망</td>
+                    <td>공격 범위 또는 악셀 경로 진입 시 즉시 사망</td>
+                </tr>
+                <tr>
+                    <td>🎁 보상</td>
+                    <td>공압 게이지 +1.0 회분</td>
+                </tr>
+                <tr>
+                    <td>🔄 리스폰</td>
+                    <td>3.0초 후 제자리 재생성</td>
+                </tr>
+                <tr>
+                    <td>📍 배치</td>
+                    <td>
+                        ① 평지 1기<br>
+                        ② 일렬 3기 (악셀 경로 테스트)<br>
+                        ③ 벽 근처 1기<br>
+                        ④ 공중 발판 위 1기
+                    </td>
+                </tr>
+            </table>
+
+            <h3 class="subsection-title">✅ MVP 완료 조건</h3>
+            <ul class="checklist">
+                <li>좌우 이동 중 반대키 입력 시 감속 → 멈춤 → 재가속 체감</li>
+                <li>A/D 2연타 홀드로 달리며 게이지 충전 확인</li>
+                <li>질주 중 점프 시 더 먼 거리, 착지 후에도 질주 유지</li>
+                <li>지상에서 허용 방향만 악셀, 금지 방향 무시</li>
+                <li>악셀로 벽·천장 부착, 1초 후 낙하, 악셀/점프로 이탈</li>
+                <li>악셀 중 반대 방향 입력 시 역분사 (0.5 소모, 정지)</li>
+                <li>시작 게이지 2.0, 최대 4.0, 연속 악셀 가능</li>
+                <li>마우스 클릭으로 커서 방향 공격, 허수아비 처치</li>
+                <li>악셀 경로의 첫 허수아비 처치 + 정지, 게이지 +1.0</li>
+                <li>카메라가 플레이어를 부드럽게 추적</li>
+            </ul>
+
+            <h3 class="subsection-title">🚀 다음 단계 (본편)</h3>
+            <div class="warning-box">
+                <strong>본편에서 추가할 내용</strong><br><br>
+                • 🤖 적 AI 시스템 (시야, 추적, 패턴)<br>
+                • 🛡️ 방패병 및 추가 적 타입<br>
+                • 👹 특수 유닛 / 보스<br>
+                • ✨ 이펙트 (악셀 궤적, 타격 이펙트, 히트스톱)<br>
+                • 🎵 사운드 / 음악<br>
+                • 🗺️ 스테이지 구조, 체크포인트<br>
+                • 🎨 HUD 완성도<br>
+                • ⚙️ 메뉴, 옵션, 키 리바인드
+            </div>
+        </section>
+
+        <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+            <p style="font-size: 1.2rem; margin-bottom: 1rem;">🎮 Cylinder</p>
+            <p>2D 횡스크롤 스타일리시 액션 게임</p>
+            <p style="margin-top: 1rem; font-size: 0.9rem;">
+                <span class="badge badge-mvp">MVP v0.3</span>
+                최종 갱신: 2026-08-31
+            </p>
+        </div>
+    </div>
+</body>
+</html>
