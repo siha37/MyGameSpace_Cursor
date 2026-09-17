@@ -1,20 +1,28 @@
 using UnityEngine;
 using Cylinder.Core;
+using Cylinder.Enemy;
 
 namespace Cylinder.Player
 {
     /// <summary>
     /// 플레이어 악셀 시스템
-    /// - 8방향 대쉬
+    /// - 8방향 키보드 대쉬
     /// - 벽/천장 부착
     /// - 역분사
     /// - 경로 처치
     /// </summary>
     public class PlayerAccel
     {
+        private const float StickProbe = 0.25f;
+        private const RigidbodyConstraints2D BodyConstraints =
+            RigidbodyConstraints2D.FreezeRotation;
+        private const RigidbodyConstraints2D StickConstraints =
+            RigidbodyConstraints2D.FreezeAll;
+
         private readonly PlayerController _controller;
         private readonly Rigidbody2D _rb;
         private readonly PressureGauge _gauge;
+        private readonly ContactPoint2D[] _contactBuffer = new ContactPoint2D[8];
         
         private bool _isAcceling;
         private Vector2 _accelDirection;
@@ -25,9 +33,12 @@ namespace Cylinder.Player
         private float _stickElapsed;
         private SurfaceType _stickSurface;
         private Vector2 _stickNormal;
+        private Vector2 _stickPosition;
         private Collider2D _stickCollider;
         private Collider2D _ignoredStickCollider;
         private float _nextAccelAllowedTime;
+        private Vector2 _ceilingExitDir;
+        private int _preAccelMoveX = 1;
         
         private enum SurfaceType { None, Wall, Ceiling }
 
@@ -58,7 +69,6 @@ namespace Cylinder.Player
         /// </summary>
         public void TryAccel(Vector2 direction)
         {
-            // 대쉬 중 역분사만 허용. 그 외 재시전은 불가
             if (_isAcceling)
             {
                 if (IsOppositeDirection(direction, _accelDirection) &&
@@ -66,7 +76,7 @@ namespace Cylinder.Player
                 {
                     StopAccel();
                     BeginAccelRecovery();
-                    _controller.SetState(PlayerState.Idle);
+                    SetStateAfterAccel();
                 }
                 return;
             }
@@ -74,16 +84,54 @@ namespace Cylinder.Player
             if (Time.time < _nextAccelAllowedTime)
                 return;
             
-            // 방향 제한 체크
+            if (_controller.CurrentState == PlayerState.Stunned)
+                return;
+            
             if (!IsAccelDirectionAllowed(direction))
                 return;
             
-            // 게이지 소모
             if (!_gauge.TryConsume(GameConstants.AX_COST))
                 return;
             
-            // 악셀 시작
             StartAccel(direction);
+        }
+
+        /// <summary>
+        /// 천장 부착 중 Shift. 방향키 없이 같은 쪽 하단 대각으로 이탈한다.
+        /// </summary>
+        public void TryAccelFromCeiling()
+        {
+            if (_controller.CurrentState != PlayerState.CeilingStick)
+                return;
+            
+            if (_ceilingExitDir.sqrMagnitude < 0.01f)
+            {
+                _ceilingExitDir = InputHelper.SnapTo8Directions(
+                    new Vector2(_controller.FacingDirection, -1f));
+            }
+            
+            TryAccel(_ceilingExitDir);
+        }
+
+        /// <summary>
+        /// 지면 여부. 악셀 종료 후 공중이면 Jump로 두어 전방향 조준이 유지되게 한다.
+        /// </summary>
+        private bool IsOnGround()
+        {
+            RaycastHit2D hit = Physics2D.Raycast(
+                _rb.position,
+                Vector2.down,
+                0.15f,
+                LayerMask.GetMask("Ground"));
+            return hit.collider != null;
+        }
+
+        /// <summary>
+        /// 악셀 후 착지/체공 상태
+        /// </summary>
+        private void SetStateAfterAccel()
+        {
+            _controller.SetState(IsOnGround() ? PlayerState.Idle : PlayerState.Jump);
         }
 
         /// <summary>
@@ -95,8 +143,11 @@ namespace Cylinder.Player
             _accelDirection = direction.normalized;
             _accelStartPos = _rb.position;
             _accelElapsed = 0f;
+            _preAccelMoveX = _controller.FacingDirection != 0 ? _controller.FacingDirection : 1;
             
+            RestoreBodyConstraints();
             _rb.gravityScale = 0f;
+            _rb.linearVelocity = Vector2.zero;
             _controller.SetState(PlayerState.Accel);
             
             if (_isSticking)
@@ -115,22 +166,19 @@ namespace Cylinder.Player
         /// </summary>
         private void UpdateAccel()
         {
-            _accelElapsed += Time.fixedDeltaTime;
+            float dt = Time.fixedDeltaTime;
+            _accelElapsed += dt;
             
-            float progress = _accelElapsed / GameConstants.AX_TIME;
+            float speed = GameConstants.AccelSpeed;
+            float intendedNow = Mathf.Min(_accelElapsed * speed, GameConstants.AX_DIST);
+            float intendedPrev = Mathf.Min((_accelElapsed - dt) * speed, GameConstants.AX_DIST);
+            float step = Mathf.Max(0f, intendedNow - intendedPrev);
+            bool lastFrame = _accelElapsed >= GameConstants.AX_TIME - 0.0001f ||
+                             intendedNow >= GameConstants.AX_DIST - 0.0001f;
             
-            if (progress >= 1f)
-            {
-                // 악셀 종료
-                EndAccel();
-                return;
-            }
-            
-            float speed = GameConstants.AX_DIST / GameConstants.AX_TIME;
-            float step = speed * Time.fixedDeltaTime;
             Vector2 dir = _accelDirection;
             Vector2 bodyOrigin = GetBodyOrigin();
-            Vector2 hitBoxSize = new Vector2(GameConstants.AX_HIT_WIDTH, 1.6f);
+            Vector2 hitBoxSize = new Vector2(GameConstants.AX_HIT_WIDTH, GameConstants.AX_HIT_HEIGHT);
             
             RaycastHit2D enemyHit = Physics2D.BoxCast(
                 bodyOrigin,
@@ -142,6 +190,15 @@ namespace Cylinder.Player
             
             if (enemyHit.collider != null)
             {
+                Dummy dummy = enemyHit.collider.GetComponent<Dummy>();
+                if (dummy != null && dummy.IsBlockingFront(dir, _rb.position, _controller.FacingDirection))
+                {
+                    float travel = Mathf.Max(0f, enemyHit.distance);
+                    _rb.position += dir * travel;
+                    CancelAccelIntoFront();
+                    return;
+                }
+                
                 var enemy = enemyHit.collider.GetComponent<IDamageable>();
                 if (enemy != null)
                 {
@@ -150,32 +207,67 @@ namespace Cylinder.Player
                     _rb.linearVelocity = Vector2.zero;
                     enemy.TakeDamage();
                     _controller.OnKillEnemy();
-                    EndAccel();
+                    EndAccel(false);
                     return;
                 }
             }
             
-            if (TryGetBlockingGroundHit(bodyOrigin, hitBoxSize, dir, step, out RaycastHit2D hit))
+            float probe = step + StickProbe;
+            if (TryGetBlockingGroundHit(bodyOrigin, hitBoxSize, dir, probe, out RaycastHit2D hit))
             {
                 _rb.position += dir * Mathf.Max(0f, hit.distance);
-                AttachToSurface(hit.collider, hit.normal);
-                return;
+                if (AttachToSurface(hit.collider, hit.normal))
+                    return;
             }
             
-            _rb.linearVelocity = dir * speed;
+            _rb.linearVelocity = Vector2.zero;
+            _rb.position += dir * step;
+            
+            if (TryAttachFromTouchedSurface())
+                return;
+            
+            if (lastFrame)
+                EndAccel(true);
         }
 
         /// <summary>
-        /// 악셀 종료
+        /// 악셀 종료. 벽/천장에 못 닿으면 대쉬 속도의 20%로 낮춘 뒤 낙하한다.
         /// </summary>
-        private void EndAccel()
+        private void EndAccel(bool keepDashVelocity)
         {
             _isAcceling = false;
             _ignoredStickCollider = null;
+            RestoreBodyConstraints();
             _rb.gravityScale = 1f;
-            _rb.linearVelocity = Vector2.zero;
             BeginAccelRecovery();
-            _controller.SetState(PlayerState.Idle);
+
+            bool grounded = IsOnGround();
+            if (keepDashVelocity && !grounded)
+            {
+                Vector2 leftover = _accelDirection * GameConstants.AccelSpeed * GameConstants.AX_MISS_SPEED_SCALE;
+                _rb.linearVelocity = leftover;
+                _controller.SetState(PlayerState.Jump);
+                _controller.OnAccelCarryFall(leftover);
+                return;
+            }
+
+            _rb.linearVelocity = Vector2.zero;
+            SetStateAfterAccel();
+            _controller.OnAccelCarryFall(Vector2.zero);
+        }
+
+        /// <summary>
+        /// 전방 대치. 악셀을 취소하고 반대 방향으로 넉백한다.
+        /// </summary>
+        private void CancelAccelIntoFront()
+        {
+            _isAcceling = false;
+            _ignoredStickCollider = null;
+            RestoreBodyConstraints();
+            _rb.gravityScale = 1f;
+            BeginAccelRecovery();
+            Vector2 knockbackDir = -_accelDirection;
+            _controller.ApplyFrontBlockKnockback(knockbackDir);
         }
 
         /// <summary>
@@ -185,35 +277,46 @@ namespace Cylinder.Player
         {
             _isAcceling = false;
             _ignoredStickCollider = null;
+            RestoreBodyConstraints();
             _rb.gravityScale = 1f;
             _rb.linearVelocity = Vector2.zero;
+            _controller.OnAccelCarryFall(Vector2.zero);
         }
 
         /// <summary>
-        /// 표면 부착
+        /// 표면 부착. 발밑 지면 스침은 무시하고 false.
         /// </summary>
-        private void AttachToSurface(Collider2D surface, Vector2 normal)
+        private bool AttachToSurface(Collider2D surface, Vector2 normal)
         {
+            Vector2 resolvedNormal = normal.sqrMagnitude > 0.01f ? normal.normalized : Vector2.down;
+            if (IsFloorGraze(resolvedNormal, _accelDirection))
+                return false;
+
             _isAcceling = false;
             _ignoredStickCollider = null;
-            _stickNormal = normal;
+            _stickNormal = resolvedNormal;
             BeginAccelRecovery();
+            _controller.OnAccelCarryFall(Vector2.zero);
             
-            if (Vector2.Dot(normal, Vector2.up) > 0.7f)
+            if (IsFloorNormal(_stickNormal))
             {
+                RestoreBodyConstraints();
                 _rb.gravityScale = 1f;
                 _rb.linearVelocity = Vector2.zero;
                 _controller.SetState(PlayerState.Idle);
-                return;
+                return true;
             }
             
             _isSticking = true;
             _stickCollider = surface;
             _stickElapsed = 0f;
+            _stickPosition = _rb.position;
             _rb.gravityScale = 0f;
             _rb.linearVelocity = Vector2.zero;
+            _rb.constraints = StickConstraints;
+            _rb.position = _stickPosition;
             
-            if (Mathf.Abs(normal.x) > 0.7f)
+            if (Mathf.Abs(_stickNormal.x) > 0.7f)
             {
                 _stickSurface = SurfaceType.Wall;
                 _controller.SetState(PlayerState.WallStick);
@@ -221,8 +324,11 @@ namespace Cylinder.Player
             else
             {
                 _stickSurface = SurfaceType.Ceiling;
+                CacheCeilingExitDir();
                 _controller.SetState(PlayerState.CeilingStick);
             }
+
+            return true;
         }
 
         /// <summary>
@@ -230,12 +336,17 @@ namespace Cylinder.Player
         /// </summary>
         private void UpdateStick()
         {
+            _rb.linearVelocity = Vector2.zero;
+            _rb.position = _stickPosition;
+            _rb.gravityScale = 0f;
+            _rb.constraints = StickConstraints;
+            
             _stickElapsed += Time.fixedDeltaTime;
             
             if (_stickElapsed >= GameConstants.AX_STICK)
             {
-                // 부착 시간 종료 - 낙하
-                DetachFromSurface();
+                if (_stickSurface == SurfaceType.Wall || _stickSurface == SurfaceType.Ceiling)
+                    DetachFromSurface();
             }
         }
 
@@ -259,6 +370,7 @@ namespace Cylinder.Player
             _isSticking = false;
             _stickCollider = null;
             _ignoredStickCollider = null;
+            RestoreBodyConstraints();
             _rb.gravityScale = 1f;
         }
 
@@ -267,26 +379,10 @@ namespace Cylinder.Player
         /// </summary>
         private bool IsOppositeDirection(Vector2 dir1, Vector2 dir2)
         {
-            dir1 = NormalizeToAxis(dir1);
-            dir2 = NormalizeToAxis(dir2);
+            if (dir1.sqrMagnitude < 0.01f || dir2.sqrMagnitude < 0.01f)
+                return false;
             
-            return Vector2.Dot(dir1, dir2) < -0.9f;
-        }
-
-        /// <summary>
-        /// 8방향을 축으로 정규화
-        /// </summary>
-        private Vector2 NormalizeToAxis(Vector2 dir)
-        {
-            float absX = Mathf.Abs(dir.x);
-            float absY = Mathf.Abs(dir.y);
-            
-            // 상하좌우
-            if (absX < 0.1f) return new Vector2(0, Mathf.Sign(dir.y));
-            if (absY < 0.1f) return new Vector2(Mathf.Sign(dir.x), 0);
-            
-            // 대각선
-            return new Vector2(Mathf.Sign(dir.x), Mathf.Sign(dir.y)).normalized;
+            return Vector2.Dot(dir1.normalized, dir2.normalized) < GameConstants.AX_REVERSE_DOT;
         }
 
         /// <summary>
@@ -298,38 +394,30 @@ namespace Cylinder.Player
                             _controller.CurrentState != PlayerState.WallStick && 
                             _controller.CurrentState != PlayerState.CeilingStick;
             
-            // 지상: 하, 좌하, 우하 금지 (아래쪽 방향 모두 차단)
             if (isGrounded)
             {
-                // Y 성분이 음수(아래쪽)면 금지
-                if (dir.y < -0.1f)
+                if (dir.y < -GameConstants.AX_FORBIDDEN_AXIS)
                     return false;
                 
                 return true;
             }
             
-            // 천장 부착: 좌, 우, 좌하, 우하만 허용
             if (_controller.CurrentState == PlayerState.CeilingStick)
             {
-                if (dir.y > 0.1f) return false; // 상 금지
-                return true;
-            }
-            
-            // 벽 부착: 벽 쪽 방향 금지
-            if (_controller.CurrentState == PlayerState.WallStick)
-            {
-                // 벽 방향 판정 (표면 법선 벡터 사용)
-                // 법선이 좌측을 가리키면 우측 벽, 우측을 가리키면 좌측 벽
-                float wallNormalX = _stickNormal.x;
-                
-                // 벽으로 향하는 방향 금지 (법선 반대 방향)
-                if (Vector2.Dot(dir, _stickNormal) < -0.1f)
+                if (dir.y >= -GameConstants.AX_FORBIDDEN_AXIS)
                     return false;
                 
                 return true;
             }
             
-            // 공중: 모든 방향 허용
+            if (_controller.CurrentState == PlayerState.WallStick)
+            {
+                if (Vector2.Dot(dir, _stickNormal) < -GameConstants.AX_FORBIDDEN_AXIS)
+                    return false;
+                
+                return true;
+            }
+            
             return true;
         }
 
@@ -341,9 +429,105 @@ namespace Cylinder.Player
             _nextAccelAllowedTime = Time.time + GameConstants.AX_RECOVERY;
         }
 
+        /// <summary>
+        /// 천장 이탈 방향. 우상→우하, 좌상→좌하, 수직 상승→악셀 전 이동방향+하단.
+        /// </summary>
+        private void CacheCeilingExitDir()
+        {
+            Vector2 inDir = _accelDirection;
+            if (inDir.x > GameConstants.AX_FORBIDDEN_AXIS && inDir.y > GameConstants.AX_FORBIDDEN_AXIS)
+            {
+                _ceilingExitDir = InputHelper.SnapTo8Directions(new Vector2(1f, -1f));
+                return;
+            }
+            
+            if (inDir.x < -GameConstants.AX_FORBIDDEN_AXIS && inDir.y > GameConstants.AX_FORBIDDEN_AXIS)
+            {
+                _ceilingExitDir = InputHelper.SnapTo8Directions(new Vector2(-1f, -1f));
+                return;
+            }
+            
+            int moveX = _preAccelMoveX != 0 ? _preAccelMoveX : _controller.FacingDirection;
+            if (moveX == 0)
+                moveX = 1;
+            _ceilingExitDir = InputHelper.SnapTo8Directions(new Vector2(moveX, -1f));
+        }
+
         private Vector2 GetBodyOrigin()
         {
-            return _rb.position + Vector2.up * 0.9f;
+            return _rb.position + Vector2.up * GameConstants.P_BODY_OFFSET_Y;
+        }
+
+        private void RestoreBodyConstraints()
+        {
+            _rb.constraints = BodyConstraints;
+        }
+
+        /// <summary>
+        /// 악셀 경로가 벽/천장과 겹치면 그 지점에 부착한다.
+        /// </summary>
+        private bool TryAttachFromTouchedSurface()
+        {
+            int count = _rb.GetContacts(_contactBuffer);
+            Collider2D bestCollider = null;
+            Vector2 bestNormal = Vector2.zero;
+            float bestScore = float.MaxValue;
+            int groundLayer = LayerMask.NameToLayer("Ground");
+            
+            for (int i = 0; i < count; i++)
+            {
+                ContactPoint2D contact = _contactBuffer[i];
+                if (contact.collider == null)
+                    continue;
+                if (contact.collider.gameObject.layer != groundLayer)
+                    continue;
+                if (_ignoredStickCollider != null && contact.collider == _ignoredStickCollider)
+                    continue;
+                
+                Vector2 normal = contact.normal;
+                if (IsFloorGraze(normal, _accelDirection))
+                    continue;
+                
+                float intoSurface = Vector2.Dot(_accelDirection, -normal);
+                if (intoSurface < 0.05f)
+                    continue;
+                
+                float score = contact.separation;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    bestCollider = contact.collider;
+                    bestNormal = normal;
+                }
+            }
+            
+            if (bestCollider != null)
+            {
+                return AttachToSurface(bestCollider, bestNormal);
+            }
+            
+            Vector2 origin = GetBodyOrigin();
+            Vector2 size = new Vector2(
+                GameConstants.AX_HIT_WIDTH + 0.08f,
+                GameConstants.AX_HIT_HEIGHT + 0.08f);
+            Collider2D overlap = Physics2D.OverlapBox(origin, size, 0f, LayerMask.GetMask("Ground"));
+            if (overlap == null)
+                return false;
+            if (_ignoredStickCollider != null && overlap == _ignoredStickCollider)
+                return false;
+            
+            Vector2 closest = overlap.ClosestPoint(origin);
+            Vector2 fromSurface = origin - closest;
+            Vector2 normalFromOverlap = fromSurface.sqrMagnitude > 0.0001f
+                ? fromSurface.normalized
+                : -_accelDirection;
+            
+            if (IsFloorGraze(normalFromOverlap, _accelDirection))
+                return false;
+            if (Vector2.Dot(_accelDirection, -normalFromOverlap) < 0.05f)
+                return false;
+            
+            return AttachToSurface(overlap, normalFromOverlap);
         }
 
         private bool TryGetBlockingGroundHit(Vector2 origin, Vector2 size, Vector2 dir, float distance, out RaycastHit2D hit)
@@ -362,6 +546,9 @@ namespace Cylinder.Player
                 if (_ignoredStickCollider != null && candidate.collider == _ignoredStickCollider)
                     continue;
                 
+                if (IsFloorGraze(candidate.normal, dir))
+                    continue;
+                
                 if (candidate.distance < 0.05f && Vector2.Dot(dir, candidate.normal) > 0.01f)
                     continue;
                 
@@ -374,6 +561,23 @@ namespace Cylinder.Player
             }
             
             return found;
+        }
+
+        private static bool IsFloorNormal(Vector2 normal)
+        {
+            return Vector2.Dot(normal, Vector2.up) > 0.7f;
+        }
+
+        /// <summary>
+        /// 좌우·상향 악셀이 발밑 지면을 벽/바닥 도달로 오인하지 않게 한다.
+        /// 하향 악셀만 지면 착지로 처리한다.
+        /// </summary>
+        private static bool IsFloorGraze(Vector2 normal, Vector2 dir)
+        {
+            if (!IsFloorNormal(normal))
+                return false;
+            
+            return dir.y > -GameConstants.AX_FORBIDDEN_AXIS;
         }
     }
 }

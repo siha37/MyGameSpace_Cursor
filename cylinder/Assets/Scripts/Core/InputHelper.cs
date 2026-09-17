@@ -4,8 +4,8 @@ namespace Cylinder.Core
 {
     /// <summary>
     /// 입력 처리 헬퍼
-    /// - 방향 입력 정규화
-    /// - 8방향 스냅
+    /// - 이동 입력
+    /// - 악셀 8방향
     /// </summary>
     public static class InputHelper
     {
@@ -26,29 +26,45 @@ namespace Cylinder.Core
         }
 
         /// <summary>
-        /// 벡터를 8방향 중 하나로 스냅
+        /// WASD·방향키를 8방향으로 스냅한 악셀 조준
         /// </summary>
-        public static Vector2 SnapTo8Directions(Vector2 input)
+        public static Vector2 GetAccelAimInput()
         {
-            if (input.magnitude < 0.1f)
+            float horizontal = 0f;
+            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) horizontal -= 1f;
+            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) horizontal += 1f;
+            
+            float vertical = 0f;
+            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) vertical += 1f;
+            if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) vertical -= 1f;
+            
+            Vector2 raw = new Vector2(horizontal, vertical);
+            if (raw.sqrMagnitude < 0.01f)
                 return Vector2.zero;
             
-            // 8방향 각도 계산
-            float angle = Mathf.Atan2(input.y, input.x) * Mathf.Rad2Deg;
-            
-            // 45도 단위로 스냅
-            float snappedAngle = Mathf.Round(angle / 45f) * 45f;
-            float rad = snappedAngle * Mathf.Deg2Rad;
-            
-            return new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)).normalized;
+            return SnapTo8Directions(raw);
         }
 
         /// <summary>
-        /// Shift 키 눌림 여부
+        /// 입력을 8방향 단위 벡터로 스냅
         /// </summary>
-        public static bool IsShiftPressed()
+        public static Vector2 SnapTo8Directions(Vector2 input)
         {
-            return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            if (input.sqrMagnitude < 0.01f)
+                return Vector2.zero;
+            
+            float angle = Mathf.Atan2(input.y, input.x);
+            float step = Mathf.PI / 4f;
+            float snapped = Mathf.Round(angle / step) * step;
+            return new Vector2(Mathf.Cos(snapped), Mathf.Sin(snapped));
+        }
+
+        /// <summary>
+        /// Shift 탭
+        /// </summary>
+        public static bool IsAccelPressedThisFrame()
+        {
+            return Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift);
         }
     }
 }

@@ -1,0 +1,5 @@
+[Unity Development Rules]
+1. DO NOT truncate code with comments like "// keep existing code". Always output the full class or method being modified.
+2. Maintain all [SerializeField] fields and Unity callback methods unless explicitly asked to remove them.
+3. After writing code, provide a brief "Verification Checklist" showing how this code meets the user's requirements.
+4. The user's saved Unity scene is the source of truth. Do not edit .unity scene files, do not run TestRoomSetup auto-apply, and do not use Unity MCP to change the scene unless the user explicitly asks to modify the scene.
